@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sound Detective</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Special+Elite&display=swap">
+<style>
+/* Layout: detective's desk (green felt). Case board of manila folders, then a play area: word card + evidence bins, or a letter strip for sound mapping */
+:root{
+  --felt:#1f4d3f; --felt2:#245a4a; --manila:#f3dca3; --manila2:#e2c47c; --paper:#fffaf0; --ink:#1f1a14;
+  --stamp:#c8372d; --hl:#fff35c; --blue:#2f6fd0; --green:#2e9b5b; --muted:#6b5a3e;
+  --type:"Special Elite","Courier New",monospace;
+  --read:"Comic Neue","Comic Sans MS",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--felt);color:var(--paper);font-family:var(--read);padding-inline:16px;padding-block:12px 26px;
+  background-image:radial-gradient(circle at 20% 10%,var(--felt2) 0,transparent 45%),radial-gradient(circle at 85% 90%,#1a4337 0,transparent 50%)}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-family:var(--type);font-weight:400;font-size:clamp(1.7rem,4.6vw,2.6rem);margin:0;letter-spacing:1px}
+.hud{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{background:var(--paper);color:var(--ink);border:3px solid var(--ink);border-radius:999px;padding:5px 14px;font-weight:700;font-size:1.1rem;font-variant-numeric:tabular-nums}
+.btn{font-family:var(--read);font-weight:700;background:var(--paper);color:var(--ink);border:3px solid var(--ink);border-radius:12px;padding:5px 12px;font-size:1.05rem;cursor:pointer}
+button:focus-visible{outline:4px solid var(--hl);outline-offset:3px}
+
+/* case board */
+.lead{margin:0;font-family:var(--type);font-size:clamp(1.2rem,3.2vw,1.6rem)}
+.folders{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.folder{position:relative;border:3px solid var(--ink);border-radius:4px 14px 14px 14px;background:var(--manila);color:var(--ink);padding:30px 18px 20px;text-align:left;cursor:pointer;
+  box-shadow:0 6px 0 rgba(0,0,0,.35);display:flex;flex-direction:column;gap:8px;min-height:170px;transition:transform .15s}
+.folder::before{content:"";position:absolute;top:-18px;left:-3px;width:44%;height:20px;background:var(--manila2);border:3px solid var(--ink);border-bottom:none;border-radius:10px 10px 0 0}
+.folder:hover{transform:translateY(-4px) rotate(-1deg)}
+.folder .no{font-family:var(--type);font-size:1rem;color:var(--muted)}
+.folder .t{font-family:var(--type);font-size:1.5rem;line-height:1.2}
+.folder .d{font-size:1.05rem}
+.folder .closed{position:absolute;right:10px;bottom:12px;font-family:var(--type);color:var(--stamp);border:3px solid var(--stamp);padding:2px 8px;transform:rotate(-12deg);font-size:1.1rem;background:rgba(255,250,240,.6)}
+
+/* play */
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.casetitle{font-family:var(--type);font-size:clamp(1.2rem,3.4vw,1.7rem)}
+.meter{display:flex;gap:4px;flex-wrap:wrap}
+.meter i{width:18px;height:18px;border-radius:50%;border:2px solid var(--paper);opacity:.35}
+.meter i.on{background:var(--hl);border-color:var(--hl);opacity:1}
+.prompt{margin:0;background:var(--paper);color:var(--ink);border:3px solid var(--ink);border-radius:12px;padding:10px 14px;text-align:center;font-weight:700;font-size:clamp(1.1rem,3vw,1.4rem)}
+.stage{display:flex;flex-direction:column;align-items:center;gap:20px;min-height:260px}
+
+.card{background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:10px;padding:.15em .7em;font-weight:700;font-size:clamp(3rem,11vw,6.2rem);
+  box-shadow:0 8px 0 rgba(0,0,0,.4);transform:rotate(-1.5deg);transition:transform .5s ease,opacity .5s ease;min-width:4ch;text-align:center}
+.card.in{animation:popin .3s ease}
+.card mark{background:var(--hl);color:var(--ink);border-radius:6px;padding:0 .05em}
+.bins{display:grid;gap:14px;width:100%}
+.bin{background:var(--manila);color:var(--ink);border:4px solid var(--ink);border-radius:14px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:8px;align-items:center;box-shadow:0 6px 0 rgba(0,0,0,.4);min-width:0}
+.bin:active{transform:translateY(4px);box-shadow:none}
+.bin .lbl{font-family:var(--type);font-size:clamp(1.2rem,3.6vw,1.9rem);line-height:1.2;text-align:center}
+.bin .ct{font-weight:700;font-size:1rem;color:var(--muted)}
+.bin .got{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;min-height:1.6em}
+.bin .got span{background:var(--paper);border:2px solid var(--ink);border-radius:6px;padding:0 6px;font-weight:700;font-size:1.05rem}
+.bin.flash{animation:flash .5s}
+
+.letters{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding-top:22px}
+.lt{position:relative;font-family:var(--read);font-weight:700;font-size:clamp(3rem,10vw,5.8rem);line-height:1.1;min-width:.9em;padding:0 .08em .06em;background:var(--paper);color:var(--ink);
+  border:3px solid var(--ink);border-bottom:10px solid #d9cfbd;border-radius:10px;cursor:pointer}
+.lt.sel{background:var(--hl)}
+.lt.done{cursor:default}
+.lt.silent{color:#9a9183}
+.lt.silent::before{content:"🤫";position:absolute;top:-.5em;left:50%;transform:translateX(-50%);font-size:.32em}
+.lt.peek{animation:pulse .8s ease-in-out 3}
+.found{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:2.6em}
+.chip{font-weight:700;font-size:clamp(1.3rem,3.6vw,1.8rem);padding:4px 14px;border:3px solid var(--ink);border-radius:999px;color:var(--ink);animation:popin .3s ease}
+
+.fb{margin:0;min-height:1.5em;text-align:center;font-weight:700;font-size:clamp(1.2rem,3.4vw,1.6rem)}
+.fb.ok{color:#9ff0bf}.fb.no{color:#ffb4a8}.fb.info{color:var(--hl)}
+.controls{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.big{font-family:var(--read);font-weight:700;font-size:clamp(1.2rem,3.4vw,1.6rem);border:4px solid var(--ink);border-radius:14px;padding:10px 20px;cursor:pointer;color:var(--ink);background:var(--paper);box-shadow:0 5px 0 rgba(0,0,0,.45)}
+.big.go{background:var(--hl)}
+.big:active{transform:translateY(4px);box-shadow:none}
+.shake{animation:shake .4s}
+
+.overlay{position:fixed;inset:0;background:rgba(10,25,20,.78);display:grid;place-items:center;padding:16px;z-index:20}
+.pop{position:relative;background:var(--manila);color:var(--ink);border:4px solid var(--ink);border-radius:14px;padding:26px;max-width:580px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px;animation:popin .35s ease;max-height:92vh;overflow:auto}
+.pop h2{font-family:var(--type);font-weight:400;font-size:clamp(1.8rem,5vw,2.5rem);margin:0;text-wrap:balance}
+.pop p{margin:0;font-size:clamp(1.15rem,3.2vw,1.45rem);font-weight:700}
+.pop .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.stamp{align-self:center;font-family:var(--type);color:var(--stamp);border:5px solid var(--stamp);border-radius:8px;padding:6px 18px;font-size:clamp(2rem,7vw,3.2rem);transform:rotate(-10deg);animation:stamp .5s cubic-bezier(.3,1.6,.5,1)}
+.move{font-size:3.4rem;line-height:1}
+.timer{font-family:var(--type);font-size:3rem;color:var(--stamp);font-variant-numeric:tabular-nums}
+textarea{width:100%;min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:.92rem;border-radius:10px;border:3px solid var(--ink);padding:10px;color:var(--ink);background:#fff}
+.help{font-size:1rem!important;font-weight:400!important;text-align:left;color:var(--muted)}
+.help code{background:#fff;padding:0 4px;border-radius:4px}
+label.h{font-family:var(--type);text-align:left;font-size:1.2rem}
+canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
+@keyframes shake{0%,100%{translate:0}25%{translate:-10px}75%{translate:10px}}
+@keyframes pulse{0%,100%{background:var(--paper)}50%{background:var(--hl)}}
+@keyframes flash{0%,100%{background:var(--manila)}40%{background:#bff2d2}}
+@keyframes popin{0%{scale:.75}60%{scale:1.06}100%{scale:1}}
+@keyframes stamp{0%{scale:3;opacity:0}100%{scale:1;opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div class="wrap">
+  <header>
+    <h1>🔎 Sound Detective</h1>
+    <div class="hud">
+      <div class="pill">🔍 Clues <b id="clues">0</b></div>
+      <button class="btn" id="home">🗂 Cases</button>
+      <button class="btn" id="snd" aria-label="Sound on or off">🔊</button>
+      <button class="btn" id="teach" aria-label="Teacher setup">⚙️</button>
+    </div>
+  </header>
+
+  <section id="board" class="wrap">
+    <p class="lead">Pick a case, Detective!</p>
+    <div class="folders" id="folders"></div>
+  </section>
+
+  <section id="play" class="wrap" hidden>
+    <div class="bar"><span class="casetitle" id="ctitle"></span><div class="meter" id="meter"></div></div>
+    <p class="prompt" id="prompt"></p>
+    <div class="stage" id="stage"></div>
+    <p class="fb" id="fb" aria-live="polite"></p>
+    <div class="controls" id="controls"></div>
+  </section>
+</div>
+
+<div class="overlay" id="ov" hidden><div class="pop" id="pop"></div></div>
+
+<script>
+const SORT_DEFAULT=`# Flexing u
+? Flex it! Try the u as /ew/ first. Is it a real word? If not, flex it to /u/. | u
+u says /ew/ or /oo/: music, humid, student, Lucy, duty, cupid, humor, unite, pupil, stupid
+u says /u/: study, punish
+
+# ph and Silent h
+? Look for ph. Then look for an h you can't hear.
+ph says /f/: phone, graph, dolphin, photo
+h is silent: hour, honest, ghost, rhyme`;
+
+const MAP_DEFAULT=`student = s t u d e n t
+study = s t u d y
+punish = p u n i sh
+music = m u s i c
+hour = (h) ou r
+honest = (h) o n e s t
+phone = ph o_e n
+graph = g r a ph`;
+
+const COLORS=["#ffd23f","#8fd3ff","#ffa8cf","#a6e9b4","#ffbe85","#c9b6ff","#ff9d8a"];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let sound=true, actx=null;
+function beep(n){ if(!sound) return; try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); let t=actx.currentTime;
+  n.forEach(([f,d,ty])=>{const o=actx.createOscillator(),g=actx.createGain();o.type=ty||"triangle";o.frequency.value=f;g.gain.setValueAtTime(.16,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(actx.destination);o.start(t);o.stop(t+d);t+=d*.8;});}catch(e){} }
+const sfx={tap:()=>beep([[760,.05,"sine"]]),good:i=>beep([[600+(i||0)*60,.08],[900+(i||0)*60,.14]]),nope:()=>beep([[260,.12,"square"],[190,.2,"square"]]),
+  stamp:()=>beep([[140,.18,"square"],[90,.25,"sawtooth"]]),win:()=>beep([[523,.1],[659,.1],[784,.1],[1047,.3]])};
+
+/* ---------- parsing ---------- */
+function parseSorts(t){
+  const out=[]; let c=null;
+  t.split("\n").map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    if(l.startsWith("#")){c={type:"sort",title:l.slice(1).trim()||"Sort",hint:"",hl:"",bins:[]};out.push(c);return;}
+    if(!c){c={type:"sort",title:"Sort",hint:"",hl:"",bins:[]};out.push(c);}
+    if(l.startsWith("?")){const [h,hl]=l.slice(1).split("|");c.hint=h.trim();c.hl=(hl||"").trim();return;}
+    const k=l.indexOf(":"); if(k<0) return;
+    const words=l.slice(k+1).split(/[,\s]+/).map(w=>w.trim()).filter(Boolean);
+    if(words.length) c.bins.push({label:l.slice(0,k).trim(),words});
+  });
+  return out.filter(c=>c.bins.length>=2);
+}
+function parseMapLine(line){
+  const k=line.indexOf("="); if(k<0) throw 0;
+  const word=line.slice(0,k).trim(), toks=line.slice(k+1).trim().split(/\s+/).filter(Boolean);
+  const lw=word.toLowerCase(), letters=[...word].map(ch=>({ch,g:-1})), groups=[], pending=[]; let p=0;
+  const at=(s)=>lw.substr(p,s.length)===s.toLowerCase();
+  const assign=(len,g)=>{for(let i=0;i<len;i++){letters[p+i].g=g;groups[g].idx.push(p+i);}p+=len;};
+  toks.forEach(tok=>{
+    let silent=false; if(/^\(.*\)$/.test(tok)){silent=true;tok=tok.slice(1,-1);}
+    const [head,tail]=tok.split("_");
+    while(!at(head)&&pending.length&&at(pending[0].tail)){const pt=pending.shift();assign(pt.tail.length,pt.g);}
+    if(!head||!at(head)) throw 0;
+    const g=groups.length; groups.push({text:tok,silent,split:!!tail,idx:[]}); assign(head.length,g);
+    if(tail) pending.push({tail,g});
+  });
+  while(pending.length){const pt=pending.shift(); if(!at(pt.tail)) throw 0; assign(pt.tail.length,pt.g);}
+  if(p!==word.length) throw 0;
+  return {word,letters,groups};
+}
+function parseMaps(t){const ok=[],bad=[];t.split("\n").map(l=>l.trim()).filter(Boolean).forEach(l=>{try{ok.push(parseMapLine(l))}catch(e){bad.push(l)}});return {ok,bad};}
+
+let sortRaw=SORT_DEFAULT, mapRaw=MAP_DEFAULT;
+try{const a=localStorage.getItem("sd-sort");if(a&&parseSorts(a).length)sortRaw=a;const b=localStorage.getItem("sd-map");if(b&&parseMaps(b).ok.length)mapRaw=b;}catch(e){}
+let cases=[];
+function buildCases(){cases=[...parseSorts(sortRaw)];const m=parseMaps(mapRaw).ok;if(m.length)cases.push({type:"map",title:"Map the Sounds",words:m});}
+buildCases();
+
+let clues=0, closed=new Set(), cur=-1, caseClues=0, busy=false, tries=0, sinceBreak=0;
+const SORT_EVERY=4, MAP_EVERY=3;
+const BREAKS=[
+ ["🕵️","Sneak like a detective! Tiptoe in place for 10 steps."],
+ ["🔍","Hold up your magnifying glass. Look high, look low, look left, look right!"],
+ ["🚪","Knock on 3 pretend doors: knock, knock, KNOCK!"],
+ ["👣","Follow the footprints: 5 big stomps in place."],
+ ["🤫","Silent spy! Freeze like a statue until the timer hits 10!"],
+ ["🏃","Chase the suspect! Run in place as fast as you can."],
+ ["🧥","Pop your detective collar, then do 5 shoulder rolls."],
+ ["📸","Strike your best detective pose. Hold it! Now a new pose!"]
+];
+function shuffle(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
+function fb(m,t){$("fb").textContent=m;$("fb").className="fb "+(t||"");}
+function setControls(h){$("controls").innerHTML=h;}
+function addClue(){clues++;caseClues++;$("clues").textContent=clues;}
+function meter(n,done){$("meter").innerHTML=Array.from({length:n},(_,i)=>`<i class="${i<done?"on":""}"></i>`).join("");}
+
+/* ---------- board ---------- */
+function showBoard(){
+  cur=-1; $("play").hidden=true; $("board").hidden=false;
+  $("folders").innerHTML="";
+  cases.forEach((c,i)=>{const b=document.createElement("button");b.className="folder";
+    const n=c.type==="sort"?c.bins.reduce((s,x)=>s+x.words.length,0):c.words.length;
+    b.innerHTML=`<span class="no">CASE #${i+1}</span><span class="t">${esc(c.title)}</span><span class="d">${c.type==="sort"?"Sort the evidence":"Find every sound"} · ${n} words</span>${closed.has(i)?'<span class="closed">CLOSED</span>':""}`;
+    b.onclick=()=>{sfx.tap();openCase(i)}; $("folders").appendChild(b);});
+}
+function openCase(i){cur=i;caseClues=0;sinceBreak=0;$("board").hidden=true;$("play").hidden=false;$("ctitle").textContent=`Case #${i+1}: ${cases[i].title}`;cases[i].type==="sort"?startSort():startMap();}
+
+/* ---------- sort ---------- */
+let deck=[], di=0, hintOn=false;
+function startSort(){
+  const c=cases[cur]; deck=shuffle(c.bins.flatMap((b,bi)=>b.words.map(w=>({w,bi})))); di=0;
+  $("prompt").textContent="Read the word out loud. Then tap where it belongs.";
+  $("stage").innerHTML=`<div class="card" id="card"></div><div class="bins" id="bins" style="grid-template-columns:repeat(${c.bins.length},minmax(0,1fr))"></div>`;
+  c.bins.forEach((b,bi)=>{const el=document.createElement("button");el.className="bin";el.id="bin"+bi;
+    el.innerHTML=`<span class="lbl">${esc(b.label)}</span><span class="ct" id="ct${bi}">0 found</span><span class="got" id="got${bi}"></span>`;
+    el.onclick=()=>pickBin(bi); $("bins").appendChild(el);});
+  setControls(`<button class="big" id="hintB">💡 Hint</button>`); $("hintB").onclick=()=>{hintOn=true;showCard();fb(c.hint||"Read it slowly, sound by sound.","info");};
+  nextCard();
+}
+function showCard(){
+  const c=cases[cur], w=deck[di].w, card=$("card");
+  let html=esc(w);
+  if(hintOn&&c.hl){const k=w.toLowerCase().indexOf(c.hl.toLowerCase()); if(k>=0) html=esc(w.slice(0,k))+"<mark>"+esc(w.slice(k,k+c.hl.length))+"</mark>"+esc(w.slice(k+c.hl.length));}
+  card.innerHTML=html;
+}
+function nextCard(){
+  tries=0; hintOn=false; busy=false; meter(deck.length,di);
+  if(di>=deck.length) return caseClosed();
+  const card=$("card"); card.style.transform=""; card.style.opacity="1"; card.classList.remove("in"); void card.offsetWidth; card.classList.add("in");
+  showCard(); fb("");
+}
+function pickBin(bi){
+  if(busy||di>=deck.length) return;
+  const c=cases[cur], it=deck[di], card=$("card");
+  if(it.bi===bi){
+    busy=true; if(tries===0) addClue(); sfx.good(di%5);
+    const n=c.bins.length, x=(bi-(n-1)/2)*Math.min(260,innerWidth/(n+1));
+    card.style.transform=`translate(${x}px,140px) scale(.25) rotate(8deg)`; card.style.opacity="0";
+    const got=$("got"+bi); const s=document.createElement("span"); s.textContent=it.w; got.appendChild(s);
+    $("ct"+bi).textContent=got.children.length+" found";
+    const bin=$("bin"+bi); bin.classList.remove("flash"); void bin.offsetWidth; bin.classList.add("flash");
+    fb(tries===0?"Case cracked! +1 🔍":"You got it!","ok");
+    di++; sinceBreak++;
+    setTimeout(()=>{ if(sinceBreak>=SORT_EVERY&&di<deck.length){sinceBreak=0;brainBreak(nextCard);} else nextCard(); },650);
+  } else {
+    tries++; sfx.nope(); card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake");
+    if(tries>=2){hintOn=true;showCard();fb(c.hint||"Read it slowly, sound by sound.","info");}
+    else fb("Hmm... read it again and listen closely.","no");
+  }
+}
+
+/* ---------- map the sounds ---------- */
+let mi=0, mdone=new Set(), msel=new Set();
+function curMap(){return cases[cur].words[mi];}
+function startMap(){mi=0;mapWord();}
+function mapWord(){
+  const m=curMap(); mdone=new Set(); msel=new Set(); tries=0; busy=false; meter(cases[cur].words.length,mi);
+  $("prompt").textContent="Say the word. Then say each sound and tap the letters that spell it.";
+  $("stage").innerHTML=`<div class="letters" id="letters"></div><div class="found" id="found"></div>`;
+  m.letters.forEach((l,i)=>{const b=document.createElement("button");b.className="lt";b.textContent=l.ch;b.id="lt"+i;b.onclick=()=>tapLetter(i);$("letters").appendChild(b);});
+  setControls(`<button class="big" id="clrB">↺ Clear</button><button class="big" id="silB">🤫 Silent letter</button><button class="big go" id="sndB">✔ One sound</button>`);
+  $("clrB").onclick=clearSel; $("silB").onclick=()=>checkMap(true); $("sndB").onclick=()=>checkMap(false);
+  fb("Start with the first sound!","info");
+}
+function tapLetter(i){ if(busy||mdone.has(i)) return; sfx.tap(); msel.has(i)?msel.delete(i):msel.add(i); $("lt"+i).classList.toggle("sel",msel.has(i)); }
+function clearSel(){msel.forEach(i=>$("lt"+i).classList.remove("sel"));msel.clear();}
+function leftmost(){const m=curMap();for(let i=0;i<m.letters.length;i++) if(!mdone.has(i)) return i;return -1;}
+function checkMap(asSilent){
+  if(busy) return; const m=curMap();
+  if(!msel.size){fb("Tap the letter or letters first.","info");return;}
+  const L=leftmost(), g=m.letters[L].g, grp=m.groups[g], target=grp.idx, sel=[...msel];
+  const same=sel.length===target.length&&target.every(i=>msel.has(i));
+  if(!same){
+    tries++; sfx.nope();
+    if(!msel.has(L)) fb(`Go in order. Start with the next letter: "${m.letters[L].ch}"`,"no");
+    else if(sel.every(i=>target.includes(i))) fb(grp.split?"Almost! This sound has a partner letter later in the word.":"Almost! Another letter helps spell this sound.","no");
+    else fb("That's too many letters. Say just the next sound.","no");
+    sel.forEach(i=>{const e=$("lt"+i);e.classList.remove("shake");void e.offsetWidth;e.classList.add("shake")});
+    setTimeout(clearSel,500);
+    if(tries>=3) target.forEach(i=>{const e=$("lt"+i);e.classList.remove("peek");void e.offsetWidth;e.classList.add("peek")});
+    return;
+  }
+  if(asSilent!==grp.silent){
+    tries++; sfx.nope();
+    fb(grp.silent?"Listen... can you hear that letter? Maybe it's silent! 🤫":"We can hear that one! Tap ✔ One sound.","no");
+    return;
+  }
+  const color=COLORS[g%COLORS.length];
+  target.forEach(i=>{mdone.add(i);const e=$("lt"+i);e.classList.remove("sel","peek");e.classList.add("done");
+    if(grp.silent) e.classList.add("silent"); else e.style.borderBottomColor=color;});
+  msel.clear();
+  const chip=document.createElement("span");chip.className="chip";chip.style.background=grp.silent?"#e8e2d6":color;
+  chip.textContent=grp.silent?grp.text+" 🤫":grp.text; $("found").appendChild(chip);
+  sfx.good(g);
+  if(mdone.size===m.letters.length) return mapWordDone();
+  fb(grp.silent?"Silent letter found! 🤫":"Sound found! What's the next sound?","ok");
+}
+function mapWordDone(){
+  busy=true; const m=curMap(), n=m.groups.filter(x=>!x.silent).length;
+  if(tries===0) addClue(); sfx.win(); confetti();
+  fb(`"${m.word}" has ${n} sounds!${tries===0?" +1 🔍":""}`,"ok");
+  $("prompt").textContent="🗣 Read the whole word. ✍ Then copy it on your paper.";
+  const last=mi===cases[cur].words.length-1;
+  setControls(`<button class="big go" id="nextB">${last?"📁 Close the case":"Next word ▶"}</button>`);
+  sinceBreak++;
+  $("nextB").onclick=()=>{mi++; if(mi>=cases[cur].words.length){meter(cases[cur].words.length,mi);caseClosed();}
+    else if(sinceBreak>=MAP_EVERY){sinceBreak=0;brainBreak(mapWord);} else mapWord();};
+}
+
+/* ---------- case closed / popups ---------- */
+function showPop(h){$("pop").innerHTML=h;$("ov").hidden=false}
+function closePop(){$("ov").hidden=true}
+function brainBreak(after){
+  const [icon,move]=BREAKS[Math.floor(Math.random()*BREAKS.length)]; let s=20;
+  sfx.win();
+  showPop(`<h2>Detective Break!</h2><div class="move">${icon}</div><p>${move}</p><div class="timer" id="bt">${s}</div>
+    <div class="row"><button class="big go" id="bdone">Back to the case! 🔎</button></div>`);
+  const iv=setInterval(()=>{s--;const el=$("bt");if(el)el.textContent=s;if(s<=0){clearInterval(iv);sfx.good(4);if(el)el.textContent="✔";}},1000);
+  $("bdone").onclick=()=>{clearInterval(iv);closePop();after();};
+}
+function caseClosed(){
+  closed.add(cur); sfx.stamp(); setTimeout(()=>{sfx.win();confetti();},300);
+  const nextOpen=cases.findIndex((_,i)=>!closed.has(i));
+  if(nextOpen<0){
+    showPop(`<div class="stamp">CASE CLOSED</div><h2>🕵️ Master Detective!</h2><p>You solved every case.</p><p>🔍 ${clues} clues found</p>
+      <div class="row"><button class="big go" id="again">Play again</button></div>`);
+    $("again").onclick=()=>{closePop();closed.clear();clues=0;$("clues").textContent=0;showBoard();};
+    return;
+  }
+  showPop(`<div class="stamp">CASE CLOSED</div><h2>${esc(cases[cur].title)}</h2><p>🔍 ${caseClues} clues in this case</p>
+    <div class="row"><button class="big" id="toBoard">🗂 All cases</button><button class="big go" id="toNext">Case #${nextOpen+1} ▶</button></div>`);
+  $("toBoard").onclick=()=>{closePop();showBoard();};
+  $("toNext").onclick=()=>{closePop();openCase(nextOpen);};
+}
+function teacher(){
+  showPop(`<h2>⚙️ Teacher setup</h2>
+   <label class="h" for="ta1">Sort cases</label>
+   <p class="help"><code># Title</code> starts a case. <code>? hint | letters to highlight</code> is optional. Then one bin per line: <code>Label: word, word, word</code></p>
+   <textarea id="ta1">${esc(sortRaw)}</textarea>
+   <label class="h" for="ta2">Map the Sounds</label>
+   <p class="help">One word per line: <code>word = sound sound sound</code>. Silent letters go in ( ). Split vowels use _ like <code>phone = ph o_e n</code></p>
+   <textarea id="ta2">${esc(mapRaw)}</textarea>
+   <p class="help" id="tmsg"></p>
+   <div class="row"><button class="big" id="tDef">Restore Unit 8</button><button class="big" id="tCancel">Cancel</button><button class="big go" id="tSave">Save</button></div>`);
+  $("tCancel").onclick=closePop;
+  $("tDef").onclick=()=>{$("ta1").value=SORT_DEFAULT;$("ta2").value=MAP_DEFAULT;};
+  $("tSave").onclick=()=>{
+    const s=$("ta1").value, m=$("ta2").value, ps=parseSorts(s), pm=parseMaps(m);
+    if(pm.bad.length){$("tmsg").textContent="Check these Map lines (the sounds must spell the word): "+pm.bad.join(" · ");return;}
+    if(!ps.length&&!pm.ok.length){$("tmsg").textContent="Add at least one case.";return;}
+    sortRaw=s;mapRaw=m;try{localStorage.setItem("sd-sort",s);localStorage.setItem("sd-map",m)}catch(e){}
+    buildCases(); closed.clear(); closePop(); showBoard();
+  };
+}
+
+/* confetti */
+const cv=$("fx"),cx=cv.getContext("2d");let parts=[];
+function size(){cv.width=innerWidth;cv.height=innerHeight} addEventListener("resize",size); size();
+function confetti(){ if(matchMedia("(prefers-reduced-motion: reduce)").matches) return; const c=["#fff35c","#c8372d","#8fd3ff","#a6e9b4","#f3dca3"];
+  const st=!parts.length; for(let i=0;i<110;i++) parts.push({x:innerWidth/2,y:innerHeight/3,vx:(Math.random()-.5)*14,vy:Math.random()*-12-4,c:c[i%5],r:Math.random()*6+4,a:1}); if(st) loop(); }
+function loop(){cx.clearRect(0,0,cv.width,cv.height);parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.4;p.a-=.008;cx.globalAlpha=Math.max(p.a,0);cx.fillStyle=p.c;cx.fillRect(p.x,p.y,p.r,p.r*1.6)});
+  parts=parts.filter(p=>p.a>0&&p.y<cv.height+20); if(parts.length) requestAnimationFrame(loop); else cx.clearRect(0,0,cv.width,cv.height);}
+
+addEventListener("keydown",e=>{ if(!$("ov").hidden||cur<0||cases[cur].type!=="sort") return;
+  const n=cases[cur].bins.length;
+  if(e.key==="ArrowLeft") pickBin(0); else if(e.key==="ArrowRight") pickBin(n-1);
+  else if(/^[1-9]$/.test(e.key)&&+e.key<=n) pickBin(+e.key-1);
+});
+$("home").onclick=showBoard;
+$("snd").onclick=()=>{sound=!sound;$("snd").textContent=sound?"🔊":"🔇"};
+$("teach").onclick=teacher;
+showBoard();
+</script>
+</body>
+</html>
